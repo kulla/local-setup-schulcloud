@@ -1,0 +1,111 @@
+{
+  "info": {
+    "name": "Brandenburg SchulConnex Test",
+    "description": "Manual PKCE-based Authorization Code flow against Brandenburg's real test IDP (id-mbjs.brandenburg.de), for SVSINT-222. Run requests in order 1 -> 4.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. OIDC Discovery",
+      "request": {
+        "method": "GET",
+        "url": "{{realm_base}}/.well-known/openid-configuration"
+      }
+    },
+    {
+      "name": "2. Generate PKCE + Auth URL",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Generate a PKCE code_verifier + S256 code_challenge, and build the",
+              "// authorize URL. Keycloak requires PKCE on this client, and Postman's",
+              "// OAuth 2.0 tab in this version doesn't expose a PKCE option, so we do",
+              "// it by hand here instead of relying on the built-in 'Get New Access Token'.",
+              "const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';",
+              "let verifier = '';",
+              "for (let i = 0; i < 64; i++) {",
+              "  verifier += charset[Math.floor(Math.random() * charset.length)];",
+              "}",
+              "",
+              "const CryptoJS = require('crypto-js');",
+              "const hash = CryptoJS.SHA256(verifier);",
+              "let challenge = CryptoJS.enc.Base64.stringify(hash);",
+              "challenge = challenge.replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');",
+              "",
+              "pm.environment.set('code_verifier', verifier);",
+              "pm.environment.set('code_challenge', challenge);",
+              "",
+              "const realmBase = pm.environment.get('realm_base');",
+              "const clientId = pm.environment.get('client_id');",
+              "const redirectUri = pm.environment.get('redirect_uri');",
+              "",
+              "const authUrl = realmBase + '/protocol/openid-connect/auth' +",
+              "  '?response_type=code' +",
+              "  '&client_id=' + encodeURIComponent(clientId) +",
+              "  '&scope=openid' +",
+              "  '&redirect_uri=' + encodeURIComponent(redirectUri) +",
+              "  '&code_challenge=' + challenge +",
+              "  '&code_challenge_method=S256';",
+              "",
+              "pm.environment.set('auth_url_debug', authUrl);",
+              "",
+              "console.log('=== OPEN THIS URL IN A BROWSER, LOG IN, THEN COPY THE code= PARAM FROM THE REDIRECT ===');",
+              "console.log(authUrl);",
+              "console.log('=========================================================================================');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "https://postman-echo.com/get",
+        "description": "This request itself is a no-op (safe echo endpoint) — its only purpose is to run the pre-request script above. After sending, open View > Show Postman Console (or check the auth_url_debug environment variable) to get the URL to open in your browser."
+      }
+    },
+    {
+      "name": "3. Exchange Code for Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body = pm.response.json();",
+              "if (body.access_token) { pm.environment.set('access_token', body.access_token); }"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{realm_base}}/protocol/openid-connect/token",
+        "header": [
+          { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "grant_type", "value": "authorization_code" },
+            { "key": "client_id", "value": "{{client_id}}" },
+            { "key": "client_secret", "value": "{{client_secret}}" },
+            { "key": "code", "value": "{{auth_code}}" },
+            { "key": "redirect_uri", "value": "{{redirect_uri}}" },
+            { "key": "code_verifier", "value": "{{code_verifier}}" }
+          ]
+        },
+        "description": "Before sending: paste the 'code' value from the browser redirect URL into the 'auth_code' environment variable."
+      }
+    },
+    {
+      "name": "4. Get Person Info",
+      "request": {
+        "method": "GET",
+        "url": "https://id-mbjs.brandenburg.de/schulconnect/v1/person-info",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ]
+      }
+    }
+  ]
+}
