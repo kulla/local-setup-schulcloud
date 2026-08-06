@@ -33,6 +33,19 @@ SCHULCLOUD_REPOS_DIR="$HOME/dev/schulcloud-repos"
 
 A shell-level `SCHULCLOUD_REPOS_DIR` takes precedence over `.env.local`.
 
+## Support for third party OAuth
+
+1. Brandenburg Schulconnex is supported for development purposes in the SchulCloud local setup. Before seeding the database, your local .env file must be updated with the following variables, the values of which may be obtained from MBJS Brandenburg:
+
+* BRANDENBURG_CLIENT_ID,
+* BRANDENBURG_CLIENT_SECRET
+* BRANDENBURG_AUTH_ENDPOINT
+* BRANDENBURG_TOKEN_ENDPOINT
+* BRANDENBURG_JWKS_ENDPOINT
+* BRANDENBURG_ISSUER
+* BRANDENBURG_END_SESSION_ENDPOINT
+* BRANDENBURG_PROVISIONING_URL
+
 ## Steps for a local setup
 
 1. `scripts/steps/01-sync-schulcloud-repos.sh` — syncs `schulcloud-server`, `schulcloud-client`, and `nuxt-client` into the configured repos directory (defaults to `repos/`)
